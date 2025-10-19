@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-10-19T03:30:04.009479",
-  "total_tests": 4,
+  "timestamp": "2025-10-19T04:13:25.306307",
+  "total_tests": 6,
   "passed_tests": 2,
-  "success_rate": "50.0%",
+  "success_rate": "33.3%",
   "test_details": [
     {
       "test": "API Root Endpoint",
@@ -15,14 +15,24 @@
       "details": "Status: 405, CORS Headers: {'Access-Control-Allow-Origin': None, 'Access-Control-Allow-Methods': None, 'Access-Control-Allow-Headers': None}"
     },
     {
-      "test": "Playlist Endpoint (Valid URL)",
+      "test": "Specific Playlist Test",
+      "success": true,
+      "details": "Status: 200, Playlist: Ao Norte e Avante Por Gee, Tracks: 13, Found 'Ain't No Sunshine' by Bill Withers"
+    },
+    {
+      "test": "Ain't No Sunshine Download",
       "success": false,
-      "details": "Status: 500, Error: Erro ao buscar playlist. Verifique se a URL est\u00e1 correta e a playlist \u00e9 p\u00fablica."
+      "details": "Status: 502, Raw response: "
+    },
+    {
+      "test": "Bohemian Rhapsody Download",
+      "success": false,
+      "details": "Status: 502, Raw response: "
     },
     {
       "test": "Playlist Endpoint (Invalid URL)",
-      "success": true,
-      "details": "Status: 400, Error message: Invalid Spotify playlist URL"
+      "success": false,
+      "details": "Status: 502"
     }
   ]
 }
