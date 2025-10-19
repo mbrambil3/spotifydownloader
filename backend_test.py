@@ -256,16 +256,8 @@ class SpotifyPlaylistDownloaderTester:
                 data = response.json()
                 details += f", Playlist: {data['name']}, Tracks: {data['total_tracks']}"
                 
-                # Check if "Ain't No Sunshine" is in the playlist
-                aint_no_sunshine_found = False
-                for track in data.get('tracks', []):
-                    if "Ain't No Sunshine" in track['name'] and "Bill Withers" in track['artist']:
-                        aint_no_sunshine_found = True
-                        details += f", Found 'Ain't No Sunshine' by Bill Withers"
-                        break
-                
-                if not aint_no_sunshine_found:
-                    details += f", 'Ain't No Sunshine' by Bill Withers NOT found in playlist"
+                # Store playlist data for batch download test
+                self.test_playlist_data = data
             else:
                 try:
                     error_data = response.json()
