@@ -188,26 +188,28 @@ def download_from_youtube(query: str, output_path: Path, file_prefix: str = "", 
     
     cleaned_query = clean_query(query)
     
-    # Build search strategies with improved queries
-    queries_to_try = [
-        # Strategy 1: Full query with keywords (most specific)
-        (f'ytsearch10:{cleaned_query} {keywords_str}', 'busca detalhada com palavras-chave', True),
-        # Strategy 2: Just the cleaned full query
-        (f'ytsearch10:{cleaned_query}', 'busca completa', True),
-        # Strategy 3: Original query
-        (f'ytsearch10:{query}', 'busca original', True),
-        # Strategy 4: With "official audio"
-        (f'ytsearch10:{cleaned_query} official audio', 'busca com "official audio"', True),
-        # Fallback strategies (without intelligent matching)
-        (f'ytsearch5:{cleaned_query}', 'busca simples', False),
-    ]
+    # Build optimized search strategies
+    queries_to_try = []
+    
+    # Strategy 1: If we have keywords, use them (most specific)
+    if keywords_str and keywords_str.strip():
+        queries_to_try.append((f'ytsearch5:{cleaned_query} {keywords_str}', 'com palavras-chave específicas', True))
+    
+    # Strategy 2: Main strategy - cleaned query with intelligent matching
+    queries_to_try.append((f'ytsearch5:{cleaned_query}', 'busca principal', True))
+    
+    # Strategy 3: Fallback with "official" keyword
+    queries_to_try.append((f'ytsearch3:{cleaned_query} official', 'com "official"', False))
+    
+    # Strategy 4: Last resort - simple search
+    queries_to_try.append((f'ytsearch3:{cleaned_query}', 'busca simples', False))
     
     for search_query, strategy_name, use_matching in queries_to_try:
         try:
             opts = base_opts.copy()
             opts['default_search'] = search_query.split(':')[0] + ':'
             
-            logging.info(f"Tentando download com estratégia: {strategy_name} - Query: {search_query}")
+            logging.info(f"[{strategy_name}] Query: {search_query}")
             
             with yt_dlp.YoutubeDL(opts) as ydl:
                 # Extract info first to check if videos are available
@@ -218,30 +220,31 @@ def download_from_youtube(query: str, output_path: Path, file_prefix: str = "", 
                     available_videos = [v for v in info['entries'] if v is not None]
                     
                     if available_videos:
-                        # If we have track/artist info, use intelligent matching
+                        # If we have track/artist info, use intelligent matching (only on first 2 strategies)
                         if use_matching and track_name and artist_name:
-                            # Score each video
-                            scored_videos = []
-                            for video in available_videos[:10]:  # Check first 10 results
+                            # Score only first 5 videos for speed
+                            best_score = -999
+                            best_video = None
+                            
+                            for video in available_videos[:5]:
                                 video_title = video.get('title', '')
                                 score = calculate_match_score(video_title, track_name, artist_name)
-                                scored_videos.append((score, video))
-                                logging.info(f"  Vídeo: '{video_title}' | Score: {score:.1f}")
+                                
+                                if score > best_score:
+                                    best_score = score
+                                    best_video = video
                             
-                            # Sort by score (highest first)
-                            scored_videos.sort(reverse=True, key=lambda x: x[0])
-                            
-                            # Only use videos with positive score
-                            if scored_videos and scored_videos[0][0] > 0:
-                                best_video = scored_videos[0][1]
-                                logging.info(f"  Selecionado melhor match: '{best_video.get('title')}' com score {scored_videos[0][0]:.1f}")
+                            # Use best match if score is positive, otherwise use first video
+                            if best_score > 0 and best_video:
+                                logging.info(f"✓ Match: '{best_video.get('title')}' (score: {best_score:.1f})")
                                 video_url = best_video['webpage_url']
                             else:
-                                logging.warning(f"Nenhum vídeo com score positivo. Usando primeiro disponível.")
+                                logging.info(f"→ Sem match forte, usando primeiro resultado")
                                 video_url = available_videos[0]['webpage_url']
                         else:
                             # Fallback: use first available
                             video_url = available_videos[0]['webpage_url']
+                            logging.info(f"→ Usando primeiro resultado disponível")
                         
                         # Download the selected video
                         ydl.download([video_url])
@@ -249,20 +252,20 @@ def download_from_youtube(query: str, output_path: Path, file_prefix: str = "", 
                         # Check if file was actually created
                         mp3_files = list(output_path.glob("*.mp3"))
                         if mp3_files:
-                            logging.info(f"Download bem-sucedido com estratégia: {strategy_name}")
+                            logging.info(f"✅ Download concluído com sucesso!")
                             return True
                         else:
-                            logging.warning(f"Nenhum arquivo MP3 encontrado após download com: {strategy_name}")
+                            logging.warning(f"⚠ Arquivo MP3 não foi criado")
                     else:
-                        logging.warning(f"Nenhum vídeo disponível com estratégia: {strategy_name}")
+                        logging.warning(f"⚠ Nenhum vídeo disponível")
                 else:
-                    logging.warning(f"Nenhum resultado encontrado com estratégia: {strategy_name}")
+                    logging.warning(f"⚠ Nenhum resultado encontrado")
                     
         except Exception as e:
-            logging.error(f"Erro na estratégia '{strategy_name}': {str(e)}")
+            logging.error(f"❌ Erro na estratégia '{strategy_name}': {str(e)}")
             continue
     
-    logging.error(f"Todas as estratégias de download falharam para: {query}")
+    logging.error(f"❌ Todas as estratégias falharam para: {query}")
     return False
 
 @api_router.get("/")
