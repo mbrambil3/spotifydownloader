@@ -1,4 +1,5 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -6,10 +7,17 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
-
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
+import yt_dlp
+import asyncio
+import zipfile
+import shutil
+from concurrent.futures import ThreadPoolExecutor
+import re
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,52 +27,234 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Spotify client
+spotify_client = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
+    client_id=os.environ.get('SPOTIFY_CLIENT_ID'),
+    client_secret=os.environ.get('SPOTIFY_CLIENT_SECRET')
+))
+
 # Create the main app without a prefix
 app = FastAPI()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Thread pool for async execution
+executor = ThreadPoolExecutor(max_workers=4)
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
+# Download directory
+DOWNLOAD_DIR = Path("/tmp/spotify_downloads")
+DOWNLOAD_DIR.mkdir(exist_ok=True)
+
+# Models
+class PlaylistRequest(BaseModel):
+    url: str
+
+class Track(BaseModel):
+    id: str
+    name: str
+    artist: str
+    album: str
+    image_url: Optional[str] = None
+    duration_ms: int
+
+class PlaylistResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    total_tracks: int
+    tracks: List[Track]
+
+class DownloadRequest(BaseModel):
+    track_name: str
+    track_artist: str
+    track_id: str
+
+class DownloadAllRequest(BaseModel):
+    playlist_id: str
+    tracks: List[Track]
+
+def extract_playlist_id(url: str) -> str:
+    """Extract Spotify playlist ID from URL"""
+    patterns = [
+        r'playlist/([a-zA-Z0-9]+)',
+        r'playlist:([a-zA-Z0-9]+)'
+    ]
     
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    
+    raise ValueError("Invalid Spotify playlist URL")
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+def download_from_youtube(query: str, output_path: Path) -> bool:
+    """Download audio from YouTube and convert to MP3"""
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+        'outtmpl': str(output_path / '%(title)s.%(ext)s'),
+        'quiet': True,
+        'no_warnings': True,
+        'extract_flat': False,
+        'default_search': 'ytsearch1:',
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([query])
+        return True
+    except Exception as e:
+        logging.error(f"Download error: {e}")
+        return False
 
-# Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Spotify Playlist Downloader API"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
+@api_router.post("/playlist", response_model=PlaylistResponse)
+async def get_playlist(request: PlaylistRequest):
+    """Get playlist information from Spotify"""
+    try:
+        # Extract playlist ID
+        playlist_id = extract_playlist_id(request.url)
+        
+        # Get playlist from Spotify
+        playlist = spotify_client.playlist(playlist_id)
+        
+        # Extract tracks
+        tracks = []
+        for item in playlist['tracks']['items']:
+            if item['track']:
+                track = item['track']
+                tracks.append(Track(
+                    id=track['id'],
+                    name=track['name'],
+                    artist=', '.join([artist['name'] for artist in track['artists']]),
+                    album=track['album']['name'],
+                    image_url=track['album']['images'][0]['url'] if track['album']['images'] else None,
+                    duration_ms=track['duration_ms']
+                ))
+        
+        return PlaylistResponse(
+            id=playlist['id'],
+            name=playlist['name'],
+            description=playlist.get('description'),
+            image_url=playlist['images'][0]['url'] if playlist['images'] else None,
+            total_tracks=len(tracks),
+            tracks=tracks
+        )
     
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"Error fetching playlist: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao buscar playlist. Verifique se a URL está correta e a playlist é pública.")
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
+@api_router.post("/download-track")
+async def download_track(request: DownloadRequest, background_tasks: BackgroundTasks):
+    """Download a single track"""
+    try:
+        # Create unique directory for this download
+        download_id = str(uuid.uuid4())
+        track_dir = DOWNLOAD_DIR / download_id
+        track_dir.mkdir(exist_ok=True)
+        
+        # Search query
+        query = f"{request.track_name} {request.track_artist}"
+        
+        # Download in background
+        loop = asyncio.get_event_loop()
+        success = await loop.run_in_executor(
+            executor,
+            download_from_youtube,
+            query,
+            track_dir
+        )
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Erro ao baixar música")
+        
+        # Find the downloaded file
+        mp3_files = list(track_dir.glob("*.mp3"))
+        if not mp3_files:
+            raise HTTPException(status_code=500, detail="Arquivo não encontrado após download")
+        
+        file_path = mp3_files[0]
+        
+        # Schedule cleanup
+        def cleanup():
+            try:
+                shutil.rmtree(track_dir)
+            except:
+                pass
+        
+        background_tasks.add_task(cleanup)
+        
+        return FileResponse(
+            path=file_path,
+            filename=f"{request.track_name} - {request.track_artist}.mp3",
+            media_type="audio/mpeg"
+        )
     
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error downloading track: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao processar download")
+
+@api_router.post("/download-all")
+async def download_all(request: DownloadAllRequest, background_tasks: BackgroundTasks):
+    """Download all tracks and create a ZIP file"""
+    try:
+        # Create unique directory for this download
+        download_id = str(uuid.uuid4())
+        zip_dir = DOWNLOAD_DIR / download_id
+        zip_dir.mkdir(exist_ok=True)
+        
+        loop = asyncio.get_event_loop()
+        
+        # Download all tracks
+        for track in request.tracks:
+            query = f"{track.name} {track.artist}"
+            await loop.run_in_executor(
+                executor,
+                download_from_youtube,
+                query,
+                zip_dir
+            )
+        
+        # Create ZIP file
+        zip_path = DOWNLOAD_DIR / f"{download_id}.zip"
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for mp3_file in zip_dir.glob("*.mp3"):
+                zipf.write(mp3_file, mp3_file.name)
+        
+        # Schedule cleanup
+        def cleanup():
+            try:
+                shutil.rmtree(zip_dir)
+                if zip_path.exists():
+                    zip_path.unlink()
+            except:
+                pass
+        
+        background_tasks.add_task(cleanup)
+        
+        return FileResponse(
+            path=zip_path,
+            filename=f"{request.playlist_id}_playlist.zip",
+            media_type="application/zip"
+        )
     
-    return status_checks
+    except Exception as e:
+        logging.error(f"Error downloading all tracks: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao processar download em lote")
 
 # Include the router in the main app
 app.include_router(api_router)
