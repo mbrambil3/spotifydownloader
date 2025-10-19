@@ -73,7 +73,20 @@ function App() {
       toast.success(`${track.name} baixada com sucesso!`);
     } catch (error) {
       console.error("Error downloading track:", error);
-      toast.error("Erro ao baixar música. Tente novamente.");
+      
+      // Parse error message from backend
+      let errorMessage = "Erro ao baixar música. Tente novamente.";
+      if (error.response?.data) {
+        try {
+          const errorText = await error.response.data.text();
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.detail || errorMessage;
+        } catch (e) {
+          // If can't parse, use default message
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setDownloadingTrack(null);
     }
