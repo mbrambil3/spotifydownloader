@@ -61,11 +61,13 @@ function App() {
         }
       );
 
-      // Create download link
+      // Create download link with unique filename
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${track.name} - ${track.artist}.mp3`);
+      // Add timestamp to ensure unique filenames
+      const uniqueId = Date.now() + Math.random().toString(36).substr(2, 9);
+      link.setAttribute('download', `${track.name} - ${track.artist} [${uniqueId}].mp3`);
       document.body.appendChild(link);
       link.click();
       link.remove();
