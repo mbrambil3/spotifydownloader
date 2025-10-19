@@ -103,8 +103,63 @@ def clean_query(text: str) -> str:
     cleaned = ' '.join(cleaned.split())
     return cleaned
 
-def download_from_youtube(query: str, output_path: Path, file_prefix: str = "") -> bool:
-    """Download audio from YouTube and convert to MP3 with multiple fallback strategies"""
+def extract_additional_keywords(track_name: str) -> list:
+    """Extract genre, producer, remix type, and other identifying keywords from track name"""
+    keywords = []
+    
+    # Common patterns in track names
+    patterns = {
+        'genre': r'\b(funk|sertanejo|eletrof[uú]nk|pop|rock|rap|trap|brega|pagode|samba|forro|axé|reggae|gospel)\b',
+        'producer': r'\b([A-Z][a-z]+\s*(No\s+Beat|Beats?|Music|Prod))\b',
+        'type': r'\b(remix|acoustic|live|ao\s+vivo|vers[aã]o|edit|extended|radio)\b',
+    }
+    
+    for pattern_type, pattern in patterns.items():
+        matches = re.findall(pattern, track_name, re.IGNORECASE)
+        keywords.extend(matches)
+    
+    return keywords
+
+def calculate_match_score(video_title: str, track_name: str, artist_name: str) -> float:
+    """Calculate how well a video matches the track we're looking for"""
+    video_title_lower = video_title.lower()
+    track_name_lower = track_name.lower()
+    artist_name_lower = artist_name.lower()
+    
+    score = 0.0
+    
+    # Check if artist name appears in video title (very important)
+    artist_parts = artist_name_lower.split()
+    for part in artist_parts:
+        if len(part) > 2 and part in video_title_lower:
+            score += 30.0
+    
+    # Check if track name appears in video title
+    track_parts = track_name_lower.split()
+    for part in track_parts:
+        if len(part) > 2 and part in video_title_lower:
+            score += 10.0
+    
+    # Extract and check additional keywords (genre, producer, etc.)
+    keywords = extract_additional_keywords(track_name)
+    for keyword in keywords:
+        if keyword.lower() in video_title_lower:
+            score += 20.0
+    
+    # Bonus for "official" or "audio" in title
+    if 'official' in video_title_lower or 'oficial' in video_title_lower:
+        score += 5.0
+    if 'audio' in video_title_lower or 'lyric' in video_title_lower:
+        score += 5.0
+    
+    # Penalize if it's a cover, karaoke, or tutorial
+    if any(word in video_title_lower for word in ['cover', 'karaoke', 'tutorial', 'como tocar', 'lesson']):
+        score -= 50.0
+    
+    return score
+
+def download_from_youtube(query: str, output_path: Path, file_prefix: str = "", track_name: str = "", artist_name: str = "") -> bool:
+    """Download audio from YouTube and convert to MP3 with intelligent matching"""
     
     # Generate unique filename to avoid conflicts
     unique_id = str(uuid.uuid4())[:8]
@@ -121,34 +176,33 @@ def download_from_youtube(query: str, output_path: Path, file_prefix: str = "") 
         'quiet': True,
         'no_warnings': True,
         'extract_flat': False,
-        'ignoreerrors': True,  # Continue on download errors
-        'no_check_certificate': True,  # Ignore SSL certificate errors
+        'ignoreerrors': True,
+        'no_check_certificate': True,
         'prefer_free_formats': True,
-        'age_limit': None,  # No age restriction
+        'age_limit': None,
     }
     
-    # Strategy 1: Try with 5 results using cleaned query
+    # Extract additional keywords from track name for better search
+    additional_keywords = extract_additional_keywords(track_name) if track_name else []
+    keywords_str = ' '.join(additional_keywords[:2])  # Use top 2 keywords
+    
     cleaned_query = clean_query(query)
+    
+    # Build search strategies with improved queries
     queries_to_try = [
-        (f'ytsearch5:{cleaned_query}', 'busca com 5 resultados (query limpa)'),
-        (f'ytsearch3:{cleaned_query}', 'busca com 3 resultados (query limpa)'),
-        (f'ytsearch5:{query}', 'busca com 5 resultados (query original)'),
+        # Strategy 1: Full query with keywords (most specific)
+        (f'ytsearch10:{cleaned_query} {keywords_str}', 'busca detalhada com palavras-chave', True),
+        # Strategy 2: Just the cleaned full query
+        (f'ytsearch10:{cleaned_query}', 'busca completa', True),
+        # Strategy 3: Original query
+        (f'ytsearch10:{query}', 'busca original', True),
+        # Strategy 4: With "official audio"
+        (f'ytsearch10:{cleaned_query} official audio', 'busca com "official audio"', True),
+        # Fallback strategies (without intelligent matching)
+        (f'ytsearch5:{cleaned_query}', 'busca simples', False),
     ]
     
-    # Strategy 2: If query has multiple parts (name + artist), try variations
-    parts = query.split()
-    if len(parts) > 2:
-        # Try with just first half of the query
-        half_query = ' '.join(parts[:len(parts)//2])
-        queries_to_try.append((f'ytsearch5:{half_query}', 'busca com metade da query'))
-    
-    # Strategy 3: Try with "official" and "audio" keywords
-    queries_to_try.extend([
-        (f'ytsearch5:{cleaned_query} official audio', 'busca com "official audio"'),
-        (f'ytsearch3:{cleaned_query} official', 'busca com "official"'),
-    ])
-    
-    for search_query, strategy_name in queries_to_try:
+    for search_query, strategy_name, use_matching in queries_to_try:
         try:
             opts = base_opts.copy()
             opts['default_search'] = search_query.split(':')[0] + ':'
@@ -164,8 +218,32 @@ def download_from_youtube(query: str, output_path: Path, file_prefix: str = "") 
                     available_videos = [v for v in info['entries'] if v is not None]
                     
                     if available_videos:
-                        # Try to download the first available video
-                        video_url = available_videos[0]['webpage_url']
+                        # If we have track/artist info, use intelligent matching
+                        if use_matching and track_name and artist_name:
+                            # Score each video
+                            scored_videos = []
+                            for video in available_videos[:10]:  # Check first 10 results
+                                video_title = video.get('title', '')
+                                score = calculate_match_score(video_title, track_name, artist_name)
+                                scored_videos.append((score, video))
+                                logging.info(f"  Vídeo: '{video_title}' | Score: {score:.1f}")
+                            
+                            # Sort by score (highest first)
+                            scored_videos.sort(reverse=True, key=lambda x: x[0])
+                            
+                            # Only use videos with positive score
+                            if scored_videos and scored_videos[0][0] > 0:
+                                best_video = scored_videos[0][1]
+                                logging.info(f"  Selecionado melhor match: '{best_video.get('title')}' com score {scored_videos[0][0]:.1f}")
+                                video_url = best_video['webpage_url']
+                            else:
+                                logging.warning(f"Nenhum vídeo com score positivo. Usando primeiro disponível.")
+                                video_url = available_videos[0]['webpage_url']
+                        else:
+                            # Fallback: use first available
+                            video_url = available_videos[0]['webpage_url']
+                        
+                        # Download the selected video
                         ydl.download([video_url])
                         
                         # Check if file was actually created
