@@ -329,19 +329,24 @@ async def download_all(request: DownloadAllRequest, background_tasks: Background
         failed_tracks = []
         
         # Download all tracks (continue even if some fail)
-        for track in request.tracks:
+        for idx, track in enumerate(request.tracks):
             try:
                 query = f"{track.name} {track.artist}"
+                # Pass unique prefix to avoid file overwrites
+                file_prefix = f"track_{idx:03d}"
                 success = await loop.run_in_executor(
                     executor,
                     download_from_youtube,
                     query,
-                    zip_dir
+                    zip_dir,
+                    file_prefix
                 )
                 if success:
                     successful_downloads += 1
+                    logging.info(f"✓ Baixado com sucesso [{idx+1}/{len(request.tracks)}]: {track.name}")
                 else:
                     failed_tracks.append(track.name)
+                    logging.warning(f"✗ Falha ao baixar [{idx+1}/{len(request.tracks)}]: {track.name}")
             except Exception as e:
                 logging.error(f"Failed to download {track.name}: {e}")
                 failed_tracks.append(track.name)
