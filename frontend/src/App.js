@@ -27,7 +27,7 @@ function App() {
 
     setLoading(true);
     setPlaylist(null);
-    setProgress(0);
+    setDownloadProgress({ completed: 0, total: 0 });
 
     try {
       const response = await axios.post(`${API}/playlist`, {
