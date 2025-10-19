@@ -336,13 +336,16 @@ async def download_track(request: DownloadRequest, background_tasks: BackgroundT
         # Search query
         query = f"{request.track_name} {request.track_artist}"
         
-        # Download in background
+        # Download in background with track name and artist for intelligent matching
         loop = asyncio.get_event_loop()
         success = await loop.run_in_executor(
             executor,
             download_from_youtube,
             query,
-            track_dir
+            track_dir,
+            "",  # file_prefix
+            request.track_name,  # track_name for matching
+            request.track_artist  # artist_name for matching
         )
         
         if not success:
