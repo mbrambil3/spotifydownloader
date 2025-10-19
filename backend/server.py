@@ -124,13 +124,13 @@ async def get_playlist(request: PlaylistRequest):
         # Extract playlist ID
         playlist_id = extract_playlist_id(request.url)
         
-        # Get playlist from Spotify
-        playlist = spotify_client.playlist(playlist_id)
+        # Get playlist from Spotify with market parameter
+        playlist = spotify_client.playlist(playlist_id, market='BR')
         
         # Extract tracks
         tracks = []
         for item in playlist['tracks']['items']:
-            if item['track']:
+            if item['track'] and item['track']['id']:  # Check if track exists and has ID
                 track = item['track']
                 tracks.append(Track(
                     id=track['id'],
@@ -140,6 +140,9 @@ async def get_playlist(request: PlaylistRequest):
                     image_url=track['album']['images'][0]['url'] if track['album']['images'] else None,
                     duration_ms=track['duration_ms']
                 ))
+        
+        if not tracks:
+            raise HTTPException(status_code=400, detail="Esta playlist está vazia ou não possui músicas disponíveis.")
         
         return PlaylistResponse(
             id=playlist['id'],
@@ -152,9 +155,22 @@ async def get_playlist(request: PlaylistRequest):
     
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        logging.error(f"Error fetching playlist: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao buscar playlist. Verifique se a URL está correta e a playlist é pública.")
+        error_msg = str(e)
+        logging.error(f"Error fetching playlist: {error_msg}")
+        
+        # Check for specific error types
+        if '404' in error_msg:
+            raise HTTPException(
+                status_code=404, 
+                detail="Playlist não encontrada. Verifique se a URL está correta e se a playlist é pública. Nota: algumas playlists geradas pelo Spotify podem ter restrições regionais."
+            )
+        elif '401' in error_msg or '403' in error_msg:
+            raise HTTPException(status_code=403, detail="Acesso negado. A playlist pode ser privada.")
+        else:
+            raise HTTPException(status_code=500, detail="Erro ao buscar playlist. Tente novamente.")
 
 @api_router.post("/download-track")
 async def download_track(request: DownloadRequest, background_tasks: BackgroundTasks):
