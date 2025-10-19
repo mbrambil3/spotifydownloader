@@ -238,9 +238,135 @@ class SpotifyPlaylistDownloaderTester:
             self.log_test("CORS Headers", False, str(e))
             return False
 
+    def test_specific_playlist(self):
+        """Test the specific playlist mentioned in the review request"""
+        test_url = "https://open.spotify.com/playlist/51ZcbQNcDSkUi6Sn6xNQOG?si=184aeb238be849a6"
+        
+        try:
+            response = requests.post(
+                f"{self.api_url}/playlist",
+                json={"url": test_url},
+                timeout=30
+            )
+            
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            
+            if success:
+                data = response.json()
+                details += f", Playlist: {data['name']}, Tracks: {data['total_tracks']}"
+                
+                # Check if "Ain't No Sunshine" is in the playlist
+                aint_no_sunshine_found = False
+                for track in data.get('tracks', []):
+                    if "Ain't No Sunshine" in track['name'] and "Bill Withers" in track['artist']:
+                        aint_no_sunshine_found = True
+                        details += f", Found 'Ain't No Sunshine' by Bill Withers"
+                        break
+                
+                if not aint_no_sunshine_found:
+                    details += f", 'Ain't No Sunshine' by Bill Withers NOT found in playlist"
+            else:
+                try:
+                    error_data = response.json()
+                    details += f", Error: {error_data.get('detail', 'Unknown error')}"
+                except:
+                    details += f", Raw response: {response.text[:200]}"
+            
+            self.log_test("Specific Playlist Test", success, details)
+            return success, response.json() if success else None
+            
+        except Exception as e:
+            self.log_test("Specific Playlist Test", False, str(e))
+            return False, None
+
+    def test_aint_no_sunshine_download(self):
+        """Test downloading 'Ain't No Sunshine' by Bill Withers"""
+        try:
+            response = requests.post(
+                f"{self.api_url}/download-track",
+                json={
+                    "track_name": "Ain't No Sunshine",
+                    "track_artist": "Bill Withers",
+                    "track_id": "test123"
+                },
+                timeout=90  # Downloads can take time
+            )
+            
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            
+            if success:
+                # Check if response is a file (binary data)
+                content_type = response.headers.get('content-type', '')
+                content_length = len(response.content)
+                details += f", Content-Type: {content_type}, Size: {content_length} bytes"
+                
+                if content_length == 0:
+                    success = False
+                    details += ", File is empty"
+                elif 'audio' not in content_type and 'application/octet-stream' not in content_type:
+                    success = False
+                    details += f", Unexpected content-type: {content_type}"
+            else:
+                try:
+                    error_data = response.json()
+                    details += f", Error: {error_data.get('detail', 'Unknown error')}"
+                except:
+                    details += f", Raw response: {response.text[:200]}"
+            
+            self.log_test("Ain't No Sunshine Download", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Ain't No Sunshine Download", False, str(e))
+            return False
+
+    def test_bohemian_rhapsody_download(self):
+        """Test downloading 'Bohemian Rhapsody' by Queen"""
+        try:
+            response = requests.post(
+                f"{self.api_url}/download-track",
+                json={
+                    "track_name": "Bohemian Rhapsody",
+                    "track_artist": "Queen",
+                    "track_id": "test456"
+                },
+                timeout=90  # Downloads can take time
+            )
+            
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            
+            if success:
+                # Check if response is a file (binary data)
+                content_type = response.headers.get('content-type', '')
+                content_length = len(response.content)
+                details += f", Content-Type: {content_type}, Size: {content_length} bytes"
+                
+                if content_length == 0:
+                    success = False
+                    details += ", File is empty"
+                elif 'audio' not in content_type and 'application/octet-stream' not in content_type:
+                    success = False
+                    details += f", Unexpected content-type: {content_type}"
+            else:
+                try:
+                    error_data = response.json()
+                    details += f", Error: {error_data.get('detail', 'Unknown error')}"
+                except:
+                    details += f", Raw response: {response.text[:200]}"
+            
+            self.log_test("Bohemian Rhapsody Download", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Bohemian Rhapsody Download", False, str(e))
+            return False
+
     def run_all_tests(self):
         """Run all backend tests"""
-        print("🚀 Starting Spotify Playlist Downloader Backend Tests")
+        print("🚀 Starting SpotiDown Backend Tests")
         print(f"🔗 Testing API at: {self.api_url}")
         print("=" * 60)
         
@@ -249,16 +375,21 @@ class SpotifyPlaylistDownloaderTester:
             print("❌ API is not accessible. Stopping tests.")
             return False
         
-        # Test all endpoints
+        # Test basic endpoints
         self.test_cors_headers()
-        self.test_playlist_endpoint_valid()
-        self.test_playlist_endpoint_invalid()
         
-        # Note: Download tests are commented out as they require actual downloads
-        # which can be slow and may fail due to external dependencies
-        print("\n⚠️  Skipping download tests (require external services and can be slow)")
-        # self.test_download_track_endpoint()
-        # self.test_download_all_endpoint()
+        # Test the specific playlist from the review request
+        print("\n🎵 Testing specific playlist...")
+        playlist_success, playlist_data = self.test_specific_playlist()
+        
+        # Test download endpoints with specific tracks
+        print("\n⬇️  Testing download functionality...")
+        self.test_aint_no_sunshine_download()
+        self.test_bohemian_rhapsody_download()
+        
+        # Test general functionality
+        print("\n🔄 Testing general functionality...")
+        self.test_playlist_endpoint_invalid()
         
         print("\n" + "=" * 60)
         print(f"📊 Tests completed: {self.tests_passed}/{self.tests_run} passed")
