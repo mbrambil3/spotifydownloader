@@ -422,10 +422,13 @@ class SpotifyPlaylistDownloaderTester:
         print("\n🎵 Testing specific playlist...")
         playlist_success, playlist_data = self.test_specific_playlist()
         
+        # Test the batch download fix (main focus of this review)
+        print("\n📦 Testing batch download fix...")
+        self.test_batch_download_fix()
+        
         # Test download endpoints with specific tracks
-        print("\n⬇️  Testing download functionality...")
+        print("\n⬇️  Testing individual download functionality...")
         self.test_aint_no_sunshine_download()
-        self.test_bohemian_rhapsody_download()
         
         # Test general functionality
         print("\n🔄 Testing general functionality...")
