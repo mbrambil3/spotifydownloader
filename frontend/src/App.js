@@ -141,7 +141,7 @@ function App() {
           await new Promise(resolve => setTimeout(resolve, 200));
         }
 
-        const success = await handleDownloadTrack(track, true);
+        const success = await handleDownloadTrack(track, true, i);
         
         if (success) {
           successCount++;
