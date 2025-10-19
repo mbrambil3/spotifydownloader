@@ -44,7 +44,7 @@ function App() {
     }
   };
 
-  const handleDownloadTrack = async (track, isPartOfBatch = false) => {
+  const handleDownloadTrack = async (track, isPartOfBatch = false, trackIndex = null) => {
     // Add track to downloading set
     setDownloadingTracks(prev => new Set([...prev, track.id]));
     
@@ -65,9 +65,11 @@ function App() {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      // Add timestamp to ensure unique filenames
-      const uniqueId = Date.now() + Math.random().toString(36).substr(2, 9);
-      link.setAttribute('download', `${track.name} - ${track.artist} [${uniqueId}].mp3`);
+      // Add track number prefix to ensure unique filenames and maintain order
+      const fileName = trackIndex !== null 
+        ? `${String(trackIndex + 1).padStart(2, '0')} - ${track.name} - ${track.artist}.mp3`
+        : `${track.name} - ${track.artist}.mp3`;
+      link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
       link.remove();
