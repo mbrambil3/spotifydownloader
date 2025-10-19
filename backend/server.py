@@ -251,20 +251,44 @@ async def download_all(request: DownloadAllRequest, background_tasks: Background
         
         loop = asyncio.get_event_loop()
         
-        # Download all tracks
+        successful_downloads = 0
+        failed_tracks = []
+        
+        # Download all tracks (continue even if some fail)
         for track in request.tracks:
-            query = f"{track.name} {track.artist}"
-            await loop.run_in_executor(
-                executor,
-                download_from_youtube,
-                query,
-                zip_dir
+            try:
+                query = f"{track.name} {track.artist}"
+                success = await loop.run_in_executor(
+                    executor,
+                    download_from_youtube,
+                    query,
+                    zip_dir
+                )
+                if success:
+                    successful_downloads += 1
+                else:
+                    failed_tracks.append(track.name)
+            except Exception as e:
+                logging.error(f"Failed to download {track.name}: {e}")
+                failed_tracks.append(track.name)
+        
+        # Check if we have any downloads
+        mp3_files = list(zip_dir.glob("*.mp3"))
+        if not mp3_files:
+            # Cleanup
+            try:
+                shutil.rmtree(zip_dir)
+            except:
+                pass
+            raise HTTPException(
+                status_code=404,
+                detail="Nenhuma música pôde ser baixada. Todas as músicas podem estar bloqueadas ou indisponíveis no YouTube."
             )
         
         # Create ZIP file
         zip_path = DOWNLOAD_DIR / f"{download_id}.zip"
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for mp3_file in zip_dir.glob("*.mp3"):
+            for mp3_file in mp3_files:
                 zipf.write(mp3_file, mp3_file.name)
         
         # Schedule cleanup
@@ -278,12 +302,22 @@ async def download_all(request: DownloadAllRequest, background_tasks: Background
         
         background_tasks.add_task(cleanup)
         
+        # Log summary
+        total = len(request.tracks)
+        logging.info(f"Download summary: {successful_downloads}/{total} successful. Failed: {failed_tracks}")
+        
         return FileResponse(
             path=zip_path,
             filename=f"{request.playlist_id}_playlist.zip",
-            media_type="application/zip"
+            media_type="application/zip",
+            headers={
+                "X-Download-Summary": f"{successful_downloads}/{total}",
+                "X-Failed-Tracks": ",".join(failed_tracks[:5]) if failed_tracks else ""
+            }
         )
     
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error(f"Error downloading all tracks: {e}")
         raise HTTPException(status_code=500, detail="Erro ao processar download em lote")
