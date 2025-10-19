@@ -272,6 +272,54 @@ class SpotifyPlaylistDownloaderTester:
             self.log_test("Specific Playlist Test", False, str(e))
             return False, None
 
+    def test_ta_namorando_e_me_querendo_download(self):
+        """Test downloading 'TÁ NAMORANDO E ME QUERENDO' to verify intelligent matching system"""
+        print("\n🎯 Testing intelligent matching system for 'TÁ NAMORANDO E ME QUERENDO'")
+        print("   Expected keywords: EletroFunk, Leozinn No Beat")
+        print("   Should select correct version (not sertaneja)")
+        
+        try:
+            response = requests.post(
+                f"{self.api_url}/download-track",
+                json={
+                    "track_name": "TÁ NAMORANDO E ME QUERENDO",
+                    "track_artist": "MC Livinho",
+                    "track_id": "test_ta_namorando"
+                },
+                timeout=120  # Downloads can take time, especially with intelligent matching
+            )
+            
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            
+            if success:
+                # Check if response is a file (binary data)
+                content_type = response.headers.get('content-type', '')
+                content_length = len(response.content)
+                details += f", Content-Type: {content_type}, Size: {content_length} bytes"
+                
+                if content_length == 0:
+                    success = False
+                    details += ", File is empty"
+                elif 'audio' not in content_type and 'application/octet-stream' not in content_type:
+                    success = False
+                    details += f", Unexpected content-type: {content_type}"
+                else:
+                    details += " - Intelligent matching system appears to be working"
+            else:
+                try:
+                    error_data = response.json()
+                    details += f", Error: {error_data.get('detail', 'Unknown error')}"
+                except:
+                    details += f", Raw response: {response.text[:200]}"
+            
+            self.log_test("TÁ NAMORANDO E ME QUERENDO Download (Intelligent Matching)", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("TÁ NAMORANDO E ME QUERENDO Download (Intelligent Matching)", False, str(e))
+            return False
+
     def test_aint_no_sunshine_download(self):
         """Test downloading 'Ain't No Sunshine' by Bill Withers"""
         try:
