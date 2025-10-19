@@ -314,34 +314,82 @@ class SpotifyPlaylistDownloaderTester:
             self.log_test("Ain't No Sunshine Download", False, str(e))
             return False
 
-    def test_bohemian_rhapsody_download(self):
-        """Test downloading 'Bohemian Rhapsody' by Queen"""
+    def test_batch_download_fix(self):
+        """Test the batch download fix - verify all available tracks are downloaded"""
+        if not hasattr(self, 'test_playlist_data') or not self.test_playlist_data:
+            self.log_test("Batch Download Fix Test", False, "No playlist data available")
+            return False
+        
+        # Use first 3-4 tracks as requested in the review
+        tracks_to_test = self.test_playlist_data['tracks'][:4] if len(self.test_playlist_data['tracks']) >= 4 else self.test_playlist_data['tracks'][:3]
+        
+        if not tracks_to_test:
+            self.log_test("Batch Download Fix Test", False, "No tracks available for testing")
+            return False
+        
         try:
+            print(f"\n🔍 Testing batch download with {len(tracks_to_test)} tracks:")
+            for i, track in enumerate(tracks_to_test):
+                print(f"  {i+1}. {track['name']} - {track['artist']}")
+            
             response = requests.post(
-                f"{self.api_url}/download-track",
+                f"{self.api_url}/download-all",
                 json={
-                    "track_name": "Bohemian Rhapsody",
-                    "track_artist": "Queen",
-                    "track_id": "test456"
+                    "playlist_id": self.test_playlist_data['id'],
+                    "tracks": tracks_to_test
                 },
-                timeout=90  # Downloads can take time
+                timeout=180  # Longer timeout for batch downloads
             )
             
             success = response.status_code == 200
             details = f"Status: {response.status_code}"
             
             if success:
-                # Check if response is a file (binary data)
+                # Check if response is a ZIP file
                 content_type = response.headers.get('content-type', '')
                 content_length = len(response.content)
+                
+                # Check for X-Download-Summary header
+                download_summary = response.headers.get('X-Download-Summary', '')
+                failed_tracks = response.headers.get('X-Failed-Tracks', '')
+                
                 details += f", Content-Type: {content_type}, Size: {content_length} bytes"
+                
+                if download_summary:
+                    details += f", Download Summary: {download_summary}"
+                    # Parse summary to check if multiple tracks were downloaded
+                    if '/' in download_summary:
+                        successful, total = download_summary.split('/')
+                        successful = int(successful)
+                        total = int(total)
+                        
+                        if successful == 0:
+                            success = False
+                            details += ", No tracks were successfully downloaded"
+                        elif successful == 1 and total > 1:
+                            success = False
+                            details += f", Only 1 track downloaded out of {total} - possible file overwrite issue"
+                        else:
+                            details += f", Successfully downloaded {successful}/{total} tracks"
+                else:
+                    details += ", Missing X-Download-Summary header"
+                
+                if failed_tracks:
+                    details += f", Failed tracks: {failed_tracks}"
                 
                 if content_length == 0:
                     success = False
-                    details += ", File is empty"
-                elif 'audio' not in content_type and 'application/octet-stream' not in content_type:
+                    details += ", ZIP file is empty"
+                elif 'zip' not in content_type and 'application/octet-stream' not in content_type:
                     success = False
                     details += f", Unexpected content-type: {content_type}"
+                
+                # Save ZIP file for inspection if needed
+                if success and content_length > 0:
+                    with open("/app/test_download.zip", "wb") as f:
+                        f.write(response.content)
+                    details += ", ZIP file saved for inspection"
+                    
             else:
                 try:
                     error_data = response.json()
@@ -349,11 +397,11 @@ class SpotifyPlaylistDownloaderTester:
                 except:
                     details += f", Raw response: {response.text[:200]}"
             
-            self.log_test("Bohemian Rhapsody Download", success, details)
+            self.log_test("Batch Download Fix Test", success, details)
             return success
             
         except Exception as e:
-            self.log_test("Bohemian Rhapsody Download", False, str(e))
+            self.log_test("Batch Download Fix Test", False, str(e))
             return False
 
     def run_all_tests(self):
