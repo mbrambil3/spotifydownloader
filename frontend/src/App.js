@@ -44,8 +44,9 @@ function App() {
     }
   };
 
-  const handleDownloadTrack = async (track) => {
-    setDownloadingTrack(track.id);
+  const handleDownloadTrack = async (track, isPartOfBatch = false) => {
+    // Add track to downloading set
+    setDownloadingTracks(prev => new Set([...prev, track.id]));
     
     try {
       const response = await axios.post(
@@ -70,7 +71,11 @@ function App() {
       link.remove();
       window.URL.revokeObjectURL(url);
 
-      toast.success(`${track.name} baixada com sucesso!`);
+      if (!isPartOfBatch) {
+        toast.success(`${track.name} baixada com sucesso!`);
+      }
+      
+      return true; // Success
     } catch (error) {
       console.error("Error downloading track:", error);
       
@@ -93,9 +98,18 @@ function App() {
         errorMessage = `Erro: ${error.message}`;
       }
       
-      toast.error(errorMessage);
+      if (!isPartOfBatch) {
+        toast.error(errorMessage);
+      }
+      
+      return false; // Failed
     } finally {
-      setDownloadingTrack(null);
+      // Remove track from downloading set
+      setDownloadingTracks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(track.id);
+        return newSet;
+      });
     }
   };
 
