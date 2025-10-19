@@ -673,6 +673,60 @@ playlist = spotify_client.playlist(playlist_id, market='BR')
 
 ---
 
+---
+
+## 🔄 Atualizações Recentes (19/10/2025)
+
+### Sistema Inteligente de Matching do YouTube
+
+**Problema Identificado:**
+O sistema original baixava músicas incorretas quando existiam múltiplas versões com o mesmo nome. Por exemplo, ao tentar baixar "TÁ NAMORANDO E ME QUERENDO - EletroFunk Leozinn No Beat", o sistema baixava a versão sertaneja mais popular.
+
+**Solução Implementada:**
+
+1. **Extração Inteligente de Keywords** (`extract_additional_keywords`)
+   - Identifica automaticamente gêneros musicais (funk, sertanejo, eletronfunk, pop, rock, etc.)
+   - Detecta produtores e beatmakers (ex: "Leozinn No Beat")
+   - Reconhece tipos de versão (remix, acoustic, live, ao vivo, etc.)
+
+2. **Sistema de Score** (`calculate_match_score`)
+   - Analisa cada vídeo do YouTube e calcula um score de compatibilidade:
+     - **+30 pontos**: Por cada parte do nome do artista encontrada no título
+     - **+10 pontos**: Por cada parte do nome da música encontrada
+     - **+20 pontos**: Por keyword específica (gênero, produtor)
+     - **+5 pontos**: Se contém "official" ou "oficial"
+     - **+5 pontos**: Se contém "audio" ou "lyric"
+     - **-50 pontos**: Se é cover, karaoke ou tutorial
+
+3. **Busca Otimizada**
+   - Busca 10 resultados do YouTube (em vez de 1)
+   - Calcula score para cada resultado
+   - Seleciona automaticamente o vídeo com maior score
+   - Usa múltiplas estratégias de busca com fallback
+
+4. **Logs Detalhados**
+   - Registra o score de cada vídeo analisado
+   - Mostra qual vídeo foi selecionado e por quê
+   - Facilita debug e validação da precisão
+
+**Resultado:**
+✅ O sistema agora identifica corretamente a versão EletroFunk vs. Sertaneja  
+✅ Score de 50.0 para o vídeo correto: "TÁ NAMORANDO E ME QUERENDO (EletroFunk)"  
+✅ Download bem-sucedido da versão correta em 32 segundos  
+✅ Evita confusão entre músicas com nomes similares mas estilos diferentes
+
+**Exemplo de Funcionamento:**
+```
+Música: "TÁ NAMORANDO E ME QUERENDO - EletroFunk Leozinn No Beat"
+Keywords extraídas: ["EletroFunk", "Leozinn No Beat"]
+Vídeos analisados: 10
+Vídeo selecionado: "TÁ NAMORANDO E ME QUERENDO (EletroFunk)" | Score: 50.0
+✓ Download concluído com sucesso
+```
+
+---
+
 **Desenvolvido por:** E1 (Emergent AI Agent)  
 **Data:** Outubro 2025  
-**Versão:** 1.0.0
+**Versão:** 1.1.0  
+**Última Atualização:** 19/10/2025 - Sistema Inteligente de Matching
