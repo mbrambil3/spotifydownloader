@@ -120,79 +120,51 @@ function App() {
     }
 
     setDownloadingAll(true);
-    setProgress(0);
+    setDownloadProgress({ completed: 0, total: playlist.tracks.length });
+
+    toast.info(`Iniciando download de ${playlist.tracks.length} músicas...`);
 
     try {
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 10;
-        });
-      }, 1000);
+      let successCount = 0;
+      let failCount = 0;
 
-      const response = await axios.post(
-        `${API}/download-all`,
-        {
-          playlist_id: playlist.id,
-          tracks: playlist.tracks
-        },
-        {
-          responseType: 'blob'
+      // Download all tracks individually with small delays to avoid overwhelming the browser
+      for (let i = 0; i < playlist.tracks.length; i++) {
+        const track = playlist.tracks[i];
+        
+        // Small delay between downloads (200ms) to prevent browser blocking
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
-      );
 
-      clearInterval(progressInterval);
-      setProgress(100);
-
-      // Check download summary from headers
-      const summary = response.headers['x-download-summary'];
-      const failedTracks = response.headers['x-failed-tracks'];
-
-      // Create download link
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${playlist.name}.zip`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      // Show appropriate message
-      if (summary) {
-        const [success, total] = summary.split('/').map(Number);
-        if (success === total) {
-          toast.success(`Todas as ${total} músicas baixadas com sucesso!`);
+        const success = await handleDownloadTrack(track, true);
+        
+        if (success) {
+          successCount++;
         } else {
-          toast.warning(`${success} de ${total} músicas baixadas. Algumas podem estar indisponíveis no YouTube.`);
+          failCount++;
         }
+
+        // Update progress
+        setDownloadProgress({ completed: i + 1, total: playlist.tracks.length });
+      }
+
+      // Show final result
+      if (successCount === playlist.tracks.length) {
+        toast.success(`🎉 Todas as ${successCount} músicas foram baixadas com sucesso!`);
+      } else if (successCount > 0) {
+        toast.warning(`✅ ${successCount} de ${playlist.tracks.length} músicas baixadas. ${failCount} indisponíveis no YouTube.`);
       } else {
-        toast.success("Download concluído!");
+        toast.error("❌ Nenhuma música pôde ser baixada. Todas podem estar indisponíveis no YouTube.");
       }
     } catch (error) {
       console.error("Error downloading all:", error);
-      
-      // Parse error message from backend
-      let errorMessage = "Erro ao baixar playlist completa. Tente novamente.";
-      
-      if (error.response?.data) {
-        try {
-          // Check if response is a Blob
-          if (error.response.data instanceof Blob) {
-            const errorText = await error.response.data.text();
-            const errorJson = JSON.parse(errorText);
-            errorMessage = errorJson.detail || errorMessage;
-          }
-        } catch (parseError) {
-          console.error("Error parsing error response:", parseError);
-          // Use default error message
-        }
-      } else if (error.message) {
-        errorMessage = `Erro: ${error.message}`;
+      toast.error("Erro ao processar download em lote.");
+    } finally {
+      setDownloadingAll(false);
+      setDownloadProgress({ completed: 0, total: 0 });
+    }
+  };
       }
       
       toast.error(errorMessage);
