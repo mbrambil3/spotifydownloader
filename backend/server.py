@@ -194,12 +194,28 @@ async def download_track(request: DownloadRequest, background_tasks: BackgroundT
         )
         
         if not success:
-            raise HTTPException(status_code=500, detail="Erro ao baixar música")
+            # Cleanup
+            try:
+                shutil.rmtree(track_dir)
+            except:
+                pass
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Não foi possível encontrar/baixar '{request.track_name}' no YouTube. A música pode estar bloqueada ou indisponível."
+            )
         
         # Find the downloaded file
         mp3_files = list(track_dir.glob("*.mp3"))
         if not mp3_files:
-            raise HTTPException(status_code=500, detail="Arquivo não encontrado após download")
+            # Cleanup
+            try:
+                shutil.rmtree(track_dir)
+            except:
+                pass
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Arquivo não encontrado após download. A música '{request.track_name}' pode não estar disponível."
+            )
         
         file_path = mp3_files[0]
         
