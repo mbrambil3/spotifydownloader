@@ -165,14 +165,6 @@ function App() {
       setDownloadProgress({ completed: 0, total: 0 });
     }
   };
-      }
-      
-      toast.error(errorMessage);
-    } finally {
-      setDownloadingAll(false);
-      setTimeout(() => setProgress(0), 2000);
-    }
-  };
 
   const formatDuration = (ms) => {
     const minutes = Math.floor(ms / 60000);
