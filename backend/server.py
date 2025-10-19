@@ -89,9 +89,18 @@ def extract_playlist_id(url: str) -> str:
     
     raise ValueError("Invalid Spotify playlist URL")
 
+def clean_query(text: str) -> str:
+    """Remove special characters that might interfere with search"""
+    # Remove special characters but keep spaces and basic punctuation
+    cleaned = re.sub(r'[^\w\s\-\']', '', text)
+    # Remove extra spaces
+    cleaned = ' '.join(cleaned.split())
+    return cleaned
+
 def download_from_youtube(query: str, output_path: Path) -> bool:
-    """Download audio from YouTube and convert to MP3"""
-    ydl_opts = {
+    """Download audio from YouTube and convert to MP3 with multiple fallback strategies"""
+    
+    base_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
@@ -102,16 +111,71 @@ def download_from_youtube(query: str, output_path: Path) -> bool:
         'quiet': True,
         'no_warnings': True,
         'extract_flat': False,
-        'default_search': 'ytsearch1:',
+        'ignoreerrors': True,  # Continue on download errors
+        'no_check_certificate': True,  # Ignore SSL certificate errors
+        'prefer_free_formats': True,
+        'age_limit': None,  # No age restriction
     }
     
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([query])
-        return True
-    except Exception as e:
-        logging.error(f"Download error: {e}")
-        return False
+    # Strategy 1: Try with 5 results using cleaned query
+    cleaned_query = clean_query(query)
+    queries_to_try = [
+        (f'ytsearch5:{cleaned_query}', 'busca com 5 resultados (query limpa)'),
+        (f'ytsearch3:{cleaned_query}', 'busca com 3 resultados (query limpa)'),
+        (f'ytsearch5:{query}', 'busca com 5 resultados (query original)'),
+    ]
+    
+    # Strategy 2: If query has multiple parts (name + artist), try variations
+    parts = query.split()
+    if len(parts) > 2:
+        # Try with just first half of the query
+        half_query = ' '.join(parts[:len(parts)//2])
+        queries_to_try.append((f'ytsearch5:{half_query}', 'busca com metade da query'))
+    
+    # Strategy 3: Try with "official" and "audio" keywords
+    queries_to_try.extend([
+        (f'ytsearch5:{cleaned_query} official audio', 'busca com "official audio"'),
+        (f'ytsearch3:{cleaned_query} official', 'busca com "official"'),
+    ])
+    
+    for search_query, strategy_name in queries_to_try:
+        try:
+            opts = base_opts.copy()
+            opts['default_search'] = search_query.split(':')[0] + ':'
+            
+            logging.info(f"Tentando download com estratégia: {strategy_name} - Query: {search_query}")
+            
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                # Extract info first to check if videos are available
+                info = ydl.extract_info(search_query, download=False)
+                
+                if info and 'entries' in info and info['entries']:
+                    # Filter out unavailable videos
+                    available_videos = [v for v in info['entries'] if v is not None]
+                    
+                    if available_videos:
+                        # Try to download the first available video
+                        video_url = available_videos[0]['webpage_url']
+                        ydl.download([video_url])
+                        
+                        # Check if file was actually created
+                        mp3_files = list(output_path.glob("*.mp3"))
+                        if mp3_files:
+                            logging.info(f"Download bem-sucedido com estratégia: {strategy_name}")
+                            return True
+                        else:
+                            logging.warning(f"Nenhum arquivo MP3 encontrado após download com: {strategy_name}")
+                    else:
+                        logging.warning(f"Nenhum vídeo disponível com estratégia: {strategy_name}")
+                else:
+                    logging.warning(f"Nenhum resultado encontrado com estratégia: {strategy_name}")
+                    
+        except Exception as e:
+            logging.error(f"Erro na estratégia '{strategy_name}': {str(e)}")
+            continue
+    
+    logging.error(f"Todas as estratégias de download falharam para: {query}")
+    return False
 
 @api_router.get("/")
 async def root():
