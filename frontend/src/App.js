@@ -75,15 +75,22 @@ function App() {
       console.error("Error downloading track:", error);
       
       // Parse error message from backend
-      let errorMessage = "Erro ao baixar música. Tente novamente.";
+      let errorMessage = `Não foi possível baixar "${track.name}". A música pode estar indisponível no YouTube.`;
+      
       if (error.response?.data) {
         try {
-          const errorText = await error.response.data.text();
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.detail || errorMessage;
-        } catch (e) {
-          // If can't parse, use default message
+          // Check if response is a Blob
+          if (error.response.data instanceof Blob) {
+            const errorText = await error.response.data.text();
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.detail || errorMessage;
+          }
+        } catch (parseError) {
+          console.error("Error parsing error response:", parseError);
+          // Use default error message
         }
+      } else if (error.message) {
+        errorMessage = `Erro: ${error.message}`;
       }
       
       toast.error(errorMessage);
