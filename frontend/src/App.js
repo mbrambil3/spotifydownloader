@@ -320,11 +320,11 @@ function App() {
                       <Button
                         data-testid={`download-track-button-${index}`}
                         size="sm"
-                        onClick={() => handleDownloadTrack(track)}
-                        disabled={downloadingTrack === track.id}
+                        onClick={() => handleDownloadTrack(track, false)}
+                        disabled={downloadingTracks.has(track.id)}
                         className="bg-slate-800 hover:bg-emerald-600 text-slate-100 hover:text-white transition-colors"
                       >
-                        {downloadingTrack === track.id ? (
+                        {downloadingTracks.has(track.id) ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                           <Download className="w-4 h-4" />
