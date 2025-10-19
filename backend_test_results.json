@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-10-19T04:13:25.306307",
+  "timestamp": "2025-10-19T04:39:22.648610",
   "total_tests": 6,
   "passed_tests": 2,
   "success_rate": "33.3%",
@@ -17,15 +17,15 @@
     {
       "test": "Specific Playlist Test",
       "success": true,
-      "details": "Status: 200, Playlist: Ao Norte e Avante Por Gee, Tracks: 13, Found 'Ain't No Sunshine' by Bill Withers"
+      "details": "Status: 200, Playlist: Minha playlist #7, Tracks: 5"
     },
     {
-      "test": "Ain't No Sunshine Download",
+      "test": "Batch Download Fix Test",
       "success": false,
       "details": "Status: 502, Raw response: "
     },
     {
-      "test": "Bohemian Rhapsody Download",
+      "test": "Ain't No Sunshine Download",
       "success": false,
       "details": "Status: 502, Raw response: "
     },
