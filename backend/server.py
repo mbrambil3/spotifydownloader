@@ -420,7 +420,9 @@ async def download_all(request: DownloadAllRequest, background_tasks: Background
                     download_from_youtube,
                     query,
                     zip_dir,
-                    file_prefix
+                    file_prefix,
+                    track.name,  # track_name for matching
+                    track.artist  # artist_name for matching
                 )
                 if success:
                     successful_downloads += 1
