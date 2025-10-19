@@ -127,6 +127,10 @@ function App() {
       clearInterval(progressInterval);
       setProgress(100);
 
+      // Check download summary from headers
+      const summary = response.headers['x-download-summary'];
+      const failedTracks = response.headers['x-failed-tracks'];
+
       // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
@@ -137,10 +141,33 @@ function App() {
       link.remove();
       window.URL.revokeObjectURL(url);
 
-      toast.success("Todas as músicas baixadas com sucesso!");
+      // Show appropriate message
+      if (summary) {
+        const [success, total] = summary.split('/').map(Number);
+        if (success === total) {
+          toast.success(`Todas as ${total} músicas baixadas com sucesso!`);
+        } else {
+          toast.warning(`${success} de ${total} músicas baixadas. Algumas podem estar indisponíveis no YouTube.`);
+        }
+      } else {
+        toast.success("Download concluído!");
+      }
     } catch (error) {
       console.error("Error downloading all:", error);
-      toast.error("Erro ao baixar playlist completa. Tente novamente.");
+      
+      // Parse error message from backend
+      let errorMessage = "Erro ao baixar playlist completa. Tente novamente.";
+      if (error.response?.data) {
+        try {
+          const errorText = await error.response.data.text();
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.detail || errorMessage;
+        } catch (e) {
+          // If can't parse, use default message
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setDownloadingAll(false);
       setTimeout(() => setProgress(0), 2000);
