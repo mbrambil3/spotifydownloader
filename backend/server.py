@@ -103,8 +103,12 @@ def clean_query(text: str) -> str:
     cleaned = ' '.join(cleaned.split())
     return cleaned
 
-def download_from_youtube(query: str, output_path: Path) -> bool:
+def download_from_youtube(query: str, output_path: Path, file_prefix: str = "") -> bool:
     """Download audio from YouTube and convert to MP3 with multiple fallback strategies"""
+    
+    # Generate unique filename to avoid conflicts
+    unique_id = str(uuid.uuid4())[:8]
+    output_template = f"{file_prefix}_{unique_id}_%(title)s.%(ext)s" if file_prefix else f"{unique_id}_%(title)s.%(ext)s"
     
     base_opts = {
         'format': 'bestaudio/best',
@@ -113,7 +117,7 @@ def download_from_youtube(query: str, output_path: Path) -> bool:
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
-        'outtmpl': str(output_path / '%(title)s.%(ext)s'),
+        'outtmpl': str(output_path / output_template),
         'quiet': True,
         'no_warnings': True,
         'extract_flat': False,
