@@ -368,7 +368,12 @@ async def download_all(request: DownloadAllRequest, background_tasks: Background
         zip_path = DOWNLOAD_DIR / f"{download_id}.zip"
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for mp3_file in mp3_files:
-                zipf.write(mp3_file, mp3_file.name)
+                # Clean the filename - remove the unique prefix (track_XXX_uniqueid_)
+                clean_name = mp3_file.name
+                # Remove pattern: track_###_uniqueid_ from the start
+                import re
+                clean_name = re.sub(r'^track_\d{3}_[a-f0-9]{8}_', '', clean_name)
+                zipf.write(mp3_file, clean_name)
         
         # Schedule cleanup
         def cleanup():
