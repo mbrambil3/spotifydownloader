@@ -240,7 +240,7 @@ class SpotifyPlaylistDownloaderTester:
 
     def test_specific_playlist(self):
         """Test the specific playlist mentioned in the review request"""
-        test_url = "https://open.spotify.com/playlist/51ZcbQNcDSkUi6Sn6xNQOG?si=184aeb238be849a6"
+        test_url = "https://open.spotify.com/playlist/31VS6WHNraw7OUtj7jXdCO?si=ceE064jeQY2B1PLKTfI8WQ&pi=grOw-XSJT4KFp"
         
         try:
             response = requests.post(
