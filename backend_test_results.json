@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-10-19T03:30:04.009479",
+  "total_tests": 4,
+  "passed_tests": 2,
+  "success_rate": "50.0%",
+  "test_details": [
+    {
+      "test": "API Root Endpoint",
+      "success": true,
+      "details": "Status: 200, Response: {'message': 'Spotify Playlist Downloader API'}"
+    },
+    {
+      "test": "CORS Headers",
+      "success": false,
+      "details": "Status: 405, CORS Headers: {'Access-Control-Allow-Origin': None, 'Access-Control-Allow-Methods': None, 'Access-Control-Allow-Headers': None}"
+    },
+    {
+      "test": "Playlist Endpoint (Valid URL)",
+      "success": false,
+      "details": "Status: 500, Error: Erro ao buscar playlist. Verifique se a URL est\u00e1 correta e a playlist \u00e9 p\u00fablica."
+    },
+    {
+      "test": "Playlist Endpoint (Invalid URL)",
+      "success": true,
+      "details": "Status: 400, Error message: Invalid Spotify playlist URL"
+    }
+  ]
+}
