@@ -15,9 +15,9 @@ function App() {
   const [playlistUrl, setPlaylistUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [playlist, setPlaylist] = useState(null);
-  const [downloadingTrack, setDownloadingTrack] = useState(null);
+  const [downloadingTracks, setDownloadingTracks] = useState(new Set());
   const [downloadingAll, setDownloadingAll] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [downloadProgress, setDownloadProgress] = useState({ completed: 0, total: 0 });
 
   const handleLoadPlaylist = async () => {
     if (!playlistUrl.trim()) {
