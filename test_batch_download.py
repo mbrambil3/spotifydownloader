@@ -9,7 +9,7 @@ from datetime import datetime
 
 def test_batch_download():
     """Test the batch download fix specifically"""
-    base_url = "https://spotify-downloader-5.preview.emergentagent.com"
+    base_url = "https://trackmatch-app.preview.emergentagent.com"
     api_url = f"{base_url}/api"
     
     print("🚀 Testing SpotiDown Batch Download Fix")
