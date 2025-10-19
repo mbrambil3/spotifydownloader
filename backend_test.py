@@ -476,6 +476,7 @@ class SpotifyPlaylistDownloaderTester:
         
         # Test download endpoints with specific tracks
         print("\n⬇️  Testing individual download functionality...")
+        self.test_ta_namorando_e_me_querendo_download()
         self.test_aint_no_sunshine_download()
         
         # Test general functionality
