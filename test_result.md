@@ -189,8 +189,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Batch Download Fix - File Overwrite Prevention"
-    - "FFmpeg Integration"
+    - "Intelligent YouTube Matching System"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
