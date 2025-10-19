@@ -371,7 +371,6 @@ async def download_all(request: DownloadAllRequest, background_tasks: Background
                 # Clean the filename - remove the unique prefix (track_XXX_uniqueid_)
                 clean_name = mp3_file.name
                 # Remove pattern: track_###_uniqueid_ from the start
-                import re
                 clean_name = re.sub(r'^track_\d{3}_[a-f0-9]{8}_', '', clean_name)
                 zipf.write(mp3_file, clean_name)
         
