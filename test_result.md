@@ -195,6 +195,20 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+  - task: "Intelligent YouTube Matching System"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ INTELLIGENT MATCHING SYSTEM VERIFIED: The YouTube search accuracy system is working perfectly for 'TÁ NAMORANDO E ME QUERENDO'. Key findings: 1) Keywords correctly extracted (EletroFunk, Leozinn No Beat), 2) Multiple videos scored (10 results analyzed), 3) Correct video selected with score 50.0: 'TÁ NAMORANDO E ME QUERENDO (EletroFunk)' - NOT the sertaneja version, 4) Download completed successfully in 32 seconds, 5) FFmpeg integration working for MP3 conversion. The intelligent matching prevents wrong genre selection and ensures accurate downloads."
+
 agent_communication:
     - agent: "testing"
       message: "✅ BATCH DOWNLOAD FIX VERIFICATION COMPLETE: The file overwrite issue has been successfully resolved. Key findings: 1) Unique prefixes prevent file conflicts during download, 2) Filenames are properly cleaned in final ZIP, 3) Multiple files are successfully downloaded (2/4 available tracks), 4) Progress logging works correctly, 5) FFmpeg integration fixed and working. The fix is working as intended - all available tracks are downloaded without overwriting each other. Some tracks failing due to YouTube availability is expected behavior and not a bug."
+    - agent: "testing"
+      message: "✅ INTELLIGENT MATCHING SYSTEM TESTING COMPLETE: Successfully verified the YouTube search accuracy for 'TÁ NAMORANDO E ME QUERENDO'. The system correctly: 1) Extracts keywords (EletroFunk, Leozinn No Beat) from track names, 2) Searches YouTube with enhanced queries, 3) Calculates scores for multiple videos (found 'TÁ NAMORANDO E ME QUERENDO (EletroFunk)' with score 50.0), 4) Selects the correct version avoiding sertaneja variants, 5) Successfully downloads and converts to MP3. The intelligent matching system is working as designed and prevents incorrect genre/version downloads."
