@@ -1,13 +1,43 @@
 {
-  "timestamp": "2025-10-19T05:09:02.644993",
-  "total_tests": 1,
-  "passed_tests": 0,
-  "success_rate": "0.0%",
+  "timestamp": "2025-10-19T14:45:58.702269",
+  "total_tests": 7,
+  "passed_tests": 6,
+  "success_rate": "85.7%",
   "test_details": [
     {
       "test": "API Root Endpoint",
+      "success": true,
+      "details": "Status: 200, Response: {'message': 'Spotify Playlist Downloader API'}"
+    },
+    {
+      "test": "CORS Headers",
       "success": false,
-      "details": "Status: 502"
+      "details": "Status: 405, CORS Headers: {'Access-Control-Allow-Origin': None, 'Access-Control-Allow-Methods': None, 'Access-Control-Allow-Headers': None}"
+    },
+    {
+      "test": "Specific Playlist Test",
+      "success": true,
+      "details": "Status: 200, Playlist: Minha playlist #7, Tracks: 5, Target song found: T\u00c1 NAMORANDO E ME QUERENDO - EletroFunk by Leozinn No Beat"
+    },
+    {
+      "test": "Batch Download Fix Test",
+      "success": true,
+      "details": "Status: 200, Content-Type: application/zip, Size: 8134692 bytes, Download Summary: 4/4, Successfully downloaded 4/4 tracks, ZIP file saved for inspection"
+    },
+    {
+      "test": "T\u00c1 NAMORANDO E ME QUERENDO Download (Intelligent Matching)",
+      "success": true,
+      "details": "Status: 200, Content-Type: audio/mpeg, Size: 5135661 bytes - Intelligent matching system appears to be working"
+    },
+    {
+      "test": "Ain't No Sunshine Download",
+      "success": true,
+      "details": "Status: 200, Content-Type: audio/mpeg, Size: 3037293 bytes"
+    },
+    {
+      "test": "Playlist Endpoint (Invalid URL)",
+      "success": true,
+      "details": "Status: 400, Error message: Invalid Spotify playlist URL"
     }
   ]
 }
