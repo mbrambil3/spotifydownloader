@@ -263,7 +263,7 @@ function App() {
                       {downloadingAll ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Baixando {playlist.total_tracks} músicas...
+                          Baixando {downloadProgress.completed}/{downloadProgress.total} músicas...
                         </>
                       ) : (
                         <>
@@ -272,10 +272,12 @@ function App() {
                         </>
                       )}
                     </Button>
-                    {downloadingAll && progress > 0 && (
+                    {downloadingAll && downloadProgress.total > 0 && (
                       <div className="mt-4" data-testid="download-progress">
-                        <Progress value={progress} className="h-2" />
-                        <p className="text-sm text-slate-400 mt-2">{progress}% completo</p>
+                        <Progress value={(downloadProgress.completed / downloadProgress.total) * 100} className="h-2" />
+                        <p className="text-sm text-slate-400 mt-2">
+                          {downloadProgress.completed} de {downloadProgress.total} músicas processadas
+                        </p>
                       </div>
                     )}
                   </div>
